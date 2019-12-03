@@ -6,6 +6,8 @@
 [![aSYNcrone Trailer](https://i.hizliresim.com/zGzg2R.gif "aSYNcrone Trailer")](https://i.hizliresim.com/zGzg2R.gif "aSYNcrone Trailer")
 
 ------------
+##### aSYNcrone's POWER!!!
+
 [![aSYNcrone's POWER!!](https://i.hizliresim.com/bvojkY.gif "aSYNcrone Trailer")](https://i.hizliresim.com/bvojkY.gif "aSYNcrone Trailer")
 
 ------------
