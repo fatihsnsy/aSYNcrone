@@ -18,11 +18,11 @@
 
 
 ------------
-#####What is aSYNcrone?
+##### What is aSYNcrone?
 aSYNcrone is a C language based, mulltifunction SYN Flood DDoS Weapon. Disable the destination system by sending a SYN packet intensively to the destination. 
 
 ------------
-###Specifications
+### Specifications
 - Internal random IP generator
 - Using threads and faster prepare and sending SYN packets
 - Different IP Identification number
