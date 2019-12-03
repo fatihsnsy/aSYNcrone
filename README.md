@@ -29,4 +29,3 @@ aSYNcrone is a C language based, mulltifunction SYN Flood DDoS Weapon. Disable t
 
 ###### NOTE: You can contribute to the development of the project.NOTE: You can contribute to the development of the project.
 
-
