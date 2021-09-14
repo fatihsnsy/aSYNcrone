@@ -17,7 +17,7 @@
 
 `cd aSYNcrone`
 
-`gcc aSYNcrone.c -o aSYNcrone -lpthread`
+`gcc aSYNcrone.c -o aSYNcrone -lpthread -O2`
 
 `./aSYNcrone <source port> <target IP> <target port> <thread number>`
 
