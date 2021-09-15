@@ -72,7 +72,7 @@ void bilgi(){
         time(&end_time);
         time_diff = difftime(end_time, start_time);
         printf("\n\n----------------------------------------------------------");
-        printf("\n\nNumber of PACKETS: "YSL"%d"RESET" \t Attack Time: "YSL"%.2f"RESET" second \n\n"RESET, p_num, time_diff);
+        printf("\n\nNumber of PACKETS: "YSL"%lu"RESET" \t Attack Time: "YSL"%.2f"RESET" second \n\n"RESET, p_num, time_diff);
         printf("----------------------------------------------------------\n\n");
         pthread_mutex_destroy(&mut);
         exit(1);
