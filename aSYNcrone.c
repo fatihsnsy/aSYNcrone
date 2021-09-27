@@ -120,7 +120,7 @@ int main(int argc, char *argv[]){
         exit(0);
     }
     
-    tani_tim();
+    tanitim();
     
     struct thread_info th_param;                                               
     //Create raw socket
