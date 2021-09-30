@@ -13,7 +13,7 @@
 ------------
 
 ##### USAGE
-`git clone https://github.com/fatih4842/aSYNcrone.git`
+`git clone https://github.com/fatihsnsy/aSYNcrone.git`
 
 `cd aSYNcrone`
 
